@@ -1,0 +1,64 @@
+#!/bin/bash
+set -euo pipefail
+
+# update-segment -- Segment release script.
+#
+# Edward Smith, October 2017
+
+scriptname=$(basename "${BASH_SOURCE[0]}")
+scriptpath="${BASH_SOURCE[0]}"
+scriptpath=$(cd "$(dirname "${scriptpath}")" && pwd)
+cd "${scriptpath}"
+
+# Make sure the version, podspec, and CHANGELOG.md are all updated.
+version=0.1.24
+
+$EDITOR Segment-Branch.podspec
+$EDITOR CHANGELOG.md
+$EDITOR update-segment
+echo ">>> update-segment"
+echo ">>> Check that the version is updated in:"
+echo ">>> 'Segment-Branch.podspec', 'CHANGELOG.md', and 'update-segment'."
+askYN "Continue?"
+
+# Make sure the examples compile:
+
+phone="iPhone 7 Plus"
+phoneOS="latest"
+homedir=`pwd`
+
+echo ">>> Building Examples/Basic..."
+cd Examples/Basic
+pod install
+pod update
+xcodebuild \
+    -workspace Segment-Branch.xcworkspace \
+    -scheme Segment-Branch-Example \
+    -destination name="$phone",OS="$phoneOS" \
+    -quiet \
+    clean build
+cd $homedir
+
+echo ">>> Building Examples/Fortune..."
+cd Examples/Fortune
+pod install
+pod update
+xcodebuild \
+    -workspace Fortune.xcworkspace \
+    -scheme Fortune \
+    -destination name="$phone",OS="$phoneOS" \
+    -quiet \
+    clean build
+cd $homedir
+
+# Commit to git and push podspec:
+
+echo ">>> Committing to git and pushing podspec."
+git add --all
+git commit -m "Prepare for release ${version}."  --allow-empty
+git tag -a "$version" -m "Version ${version}"
+git push && git push --tags
+pod trunk push Segment-Branch.podspec --allow-warnings
+
+echo ">>> Check the version number at Cocoapds.org."
+open "https://cocoapods.org/pods/Segment-Branch"
